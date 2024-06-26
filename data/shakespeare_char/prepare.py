@@ -11,7 +11,9 @@ import numpy as np
 
 # download the tiny shakespeare dataset
 input_file_path = os.path.join(os.path.dirname(__file__), 'input.txt')
-if not os.path.exists(input_file_path):
+
+if not os.path.exists(input_file_path) or os.path.getsize(input_file_path) < 100:
+    print(f"{input_file_path} does not exist or not valid! try to download.")
     data_url = 'https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt'
     with open(input_file_path, 'w') as f:
         f.write(requests.get(data_url).text)
@@ -48,8 +50,11 @@ print(f"val has {len(val_ids):,} tokens")
 # export to bin files
 train_ids = np.array(train_ids, dtype=np.uint16)
 val_ids = np.array(val_ids, dtype=np.uint16)
-train_ids.tofile(os.path.join(os.path.dirname(__file__), 'train.bin'))
-val_ids.tofile(os.path.join(os.path.dirname(__file__), 'val.bin'))
+train_data_file = os.path.join(os.path.dirname(__file__), 'train.bin')
+val_data_file = os.path.join(os.path.dirname(__file__), 'val.bin')
+
+train_ids.tofile(train_data_file)
+val_ids.tofile(val_data_file)
 
 # save the meta information as well, to help us encode/decode later
 meta = {
@@ -59,7 +64,10 @@ meta = {
 }
 with open(os.path.join(os.path.dirname(__file__), 'meta.pkl'), 'wb') as f:
     pickle.dump(meta, f)
+    print(f"meta data is saved as {f}")
 
+print(f"train_data_file is saved as {train_data_file}")
+print(f"val_data_file is saved as {val_data_file}")
 # length of dataset in characters:  1115394
 # all the unique characters:
 #  !$&',-.3:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz

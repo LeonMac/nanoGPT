@@ -29,6 +29,18 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
+def ms_to_hhmmss(milliseconds: int):
+    # Calculate hours, minutes, and seconds
+    hours = milliseconds // 3600000  # milliseconds in an hour
+    milliseconds %= 3600000
+    minutes = milliseconds // 60000   # milliseconds in a minute
+    milliseconds %= 60000
+    seconds = milliseconds // 1000     # milliseconds in a second
+
+    # Format the time as "hh:mm:ss"
+    return f"hh[{hours:02}]:mm[{minutes:02}]:ss[{seconds:02}]"
+
+
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -38,7 +50,7 @@ log_interval = 1
 eval_iters = 200
 eval_only = False # if True, script exits right after the first eval
 always_save_checkpoint = True # if True, always save a checkpoint after each eval
-init_from = 'scratch' # 'scratch' or 'resume' or 'gpt2*'
+init_from = 'resume' # 'scratch' or 'resume' or 'gpt2*'
 # wandb logging
 wandb_log = False # disabled by default
 wandb_project = 'owt'
@@ -249,6 +261,7 @@ if wandb_log and master_process:
 # training loop
 X, Y = get_batch('train') # fetch the very first batch
 t0 = time.time()
+t_begin = t0
 local_iter_num = 0 # number of iterations in the lifetime of this process
 raw_model = model.module if ddp else model # unwrap DDP container if needed
 running_mfu = -1.0
@@ -317,6 +330,7 @@ while True:
     t1 = time.time()
     dt = t1 - t0
     t0 = t1
+    t_elapse = int(t1 - t_begin)
     if iter_num % log_interval == 0 and master_process:
         # get loss as float. note: this is a CPU-GPU sync point
         # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
@@ -324,7 +338,7 @@ while True:
         if local_iter_num >= 5: # let the training loop settle a bit
             mfu = raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9*running_mfu + 0.1*mfu
-        print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
+        print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%, total elapse {ms_to_hhmmss(t_elapse)} ")
     iter_num += 1
     local_iter_num += 1
 

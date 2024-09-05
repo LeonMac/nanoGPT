@@ -29,20 +29,16 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
-def ms_to_hhmmss(milliseconds: int):
-    # Calculate hours, minutes, and seconds
-    hours = milliseconds // 3600000  # milliseconds in an hour
-    milliseconds %= 3600000
-    minutes = milliseconds // 60000   # milliseconds in a minute
-    milliseconds %= 60000
-    seconds = milliseconds // 1000     # milliseconds in a second
+from utils import checkout_para_by_GPU, s_to_hhmmss
 
-    # Format the time as "hh:mm:ss"
-    return f"hh[{hours:02}]:mm[{minutes:02}]:ss[{seconds:02}]"
+GPU = 'RTX3090'
 
+CKPT = 'ckpt.pt'
 
 # -----------------------------------------------------------------------------
-# default config values designed to train a gpt2 (124M) on OpenWebText
+# default config values designed to train a gpt2 (124M) on OpenWebText, 
+# could be overide by provided train_xx.py or by the provided GPU device
+
 # I/O
 out_dir = 'out'
 eval_interval = 2000
@@ -57,7 +53,7 @@ wandb_project = 'owt'
 wandb_run_name = 'gpt2' # 'run' + str(time.time())
 # data
 dataset = 'openwebtext'
-gradient_accumulation_steps = 5 * 8 # used to simulate larger batch sizes
+gradient_accumulation_steps = 5 * 8 # used to simulate larger batch sizes, this is for 8 A100?
 batch_size = 12 # if gradient_accumulation_steps > 1, this is the micro-batch size
 block_size = 1024
 # model
@@ -88,6 +84,9 @@ compile = True # use PyTorch 2.0 to compile the model to be faster
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
 exec(open('configurator.py').read()) # overrides from command line or config file
 config = {k: globals()[k] for k in config_keys} # will be useful for logging
+
+# custimized overide
+batch_size, block_size, gradient_accumulation_steps, flps = checkout_para_by_GPU(GPU)
 # -----------------------------------------------------------------------------
 
 # various inits, derived attributes, I/O setup
@@ -168,9 +167,9 @@ if init_from == 'scratch':
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
 elif init_from == 'resume':
-    print(f"Resuming training from {out_dir}")
+    print(f"Resuming training from {out_dir}, file name {CKPT} ")
     # resume training from a checkpoint.
-    ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+    ckpt_path = os.path.join(out_dir, CKPT)
     checkpoint = torch.load(ckpt_path, map_location=device)
     checkpoint_model_args = checkpoint['model_args']
     # force these config attributes to be equal otherwise we can't even resume training
@@ -295,8 +294,10 @@ while True:
                     'best_val_loss': best_val_loss,
                     'config': config,
                 }
-                print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                ckpt_tmp = 'iter'+str(iter_num) + '_' + CKPT
+                print(f"saving checkpoint to dir {out_dir}, file name {CKPT} and {ckpt_tmp}")
+                torch.save(checkpoint, os.path.join(out_dir, CKPT))
+                torch.save(checkpoint, os.path.join(out_dir, ckpt_tmp))
     if iter_num == 0 and eval_only:
         break
 
@@ -336,9 +337,9 @@ while True:
         # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
         lossf = loss.item() * gradient_accumulation_steps
         if local_iter_num >= 5: # let the training loop settle a bit
-            mfu = raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt)
+            mfu = raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt, flps)
             running_mfu = mfu if running_mfu == -1.0 else 0.9*running_mfu + 0.1*mfu
-        print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%, total elapse {ms_to_hhmmss(t_elapse)} ")
+        print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%, total elapse {s_to_hhmmss(t_elapse)} ")
     iter_num += 1
     local_iter_num += 1
 

@@ -19,10 +19,10 @@ def checkout_para_by_GPU(gpu:str):
     elif gpu == 'RTX3090':
         # 3090 1 x GPU
         # these make the total batch size be 
-        # 18 batch size * 1024 block size * 5 gradaccum * 1 GPUs = 
+        # 18 batch size * 1024 block size * 5 gradaccum * 2 GPUs = 
         batch_size = 20
         block_size = 1024
-        gradient_accumulation_steps = 5
+        gradient_accumulation_steps = 5 
         flps = RTX3090_FLPS
 
     print(f"By using GPU {gpu} overide the batch_size = {batch_size},\

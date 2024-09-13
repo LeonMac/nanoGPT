@@ -20,9 +20,9 @@ def checkout_para_by_GPU(gpu:str):
         # 3090 1 x GPU
         # these make the total batch size be 
         # 18 batch size * 1024 block size * 5 gradaccum * 2 GPUs = 
-        batch_size = 20
+        batch_size = 16 
         block_size = 1024
-        gradient_accumulation_steps = 5 
+        gradient_accumulation_steps = 5  
         flps = RTX3090_FLPS
 
     print(f"By using GPU {gpu} overide the batch_size = {batch_size},\
@@ -32,6 +32,7 @@ def checkout_para_by_GPU(gpu:str):
 
 def s_to_hhmmss(seconds: int):
     # Calculate hours, minutes, and seconds
+    days  = seconds // 38400
     hours = seconds // 3600    # seconds in an hour
     seconds %= 3600
     minutes = seconds // 60    # seconds in a minute
@@ -39,4 +40,4 @@ def s_to_hhmmss(seconds: int):
     seconds = int(seconds)     # seconds in a second
 
     # Format the time as "hh:mm:ss"
-    return f"h:m:s [{hours:02}]:[{minutes:02}]:[{seconds:02}]"
+    return f"d:h:m:s [{days:02}][{hours:02}]:[{minutes:02}]:[{seconds:02}]"

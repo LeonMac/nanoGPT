@@ -31,7 +31,8 @@ from model import GPTConfig, GPT
 
 from utils import checkout_para_by_GPU, s_to_hhmmss
 
-GPU = 'RTX3090'
+#GPU = 'RTX3090'
+GPU = 'dual-RTX3090'
 
 CKPT = 'ckpt.pt'
 

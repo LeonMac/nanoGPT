@@ -29,6 +29,9 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
+# import torch._dynamo
+# torch._dynamo.config.suppress_errors = True
+
 from utils import checkout_para_by_GPU, s_to_hhmmss
 
 #GPU = 'RTX3090'
@@ -80,14 +83,15 @@ backend = 'nccl' # 'nccl', 'gloo', etc.
 # system
 device = 'cuda' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1' etc., or try 'mps' on macbooks
 dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
-compile = True # use PyTorch 2.0 to compile the model to be faster
+#compile = True # use PyTorch 2.0 to compile the model to be faster
+compile = False # disable compile as some error reported regarding torch.compile()
 # -----------------------------------------------------------------------------
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
 exec(open('configurator.py').read()) # overrides from command line or config file
 config = {k: globals()[k] for k in config_keys} # will be useful for logging
 
 # custimized overide
-batch_size, block_size, gradient_accumulation_steps, flps = checkout_para_by_GPU(GPU)
+batch_size, block_size, gradient_accumulation_steps, flps = checkout_para_by_GPU(GPU, init_from)
 # -----------------------------------------------------------------------------
 
 # various inits, derived attributes, I/O setup
@@ -110,6 +114,7 @@ else:
     master_process = True
     seed_offset = 0
     ddp_world_size = 1
+
 tokens_per_iter = gradient_accumulation_steps * ddp_world_size * batch_size * block_size
 print(f"tokens per iteration will be: {tokens_per_iter:,}")
 
